@@ -1,0 +1,23 @@
+# Secrets & local config
+.env
+config.json
+session.json
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+
+# PyInstaller build output (.spec di-commit, artefak tidak)
+build/
+dist/
+
+# Caches & logs
+models_cache.json
+_pipinstall.log
+_selftest*.txt
+*.log
+
+# Knowledge graph output (lokal)
+graphify-out/

@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="id" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LLM Chess Arena</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="app-frame">
+    <!-- ============================ HEADER ============================ -->
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">♞</span>
+        <div class="brand-text">
+          <h1>Chess Arena</h1>
+          <p>Adu kepintaran LLM lewat catur</p>
+        </div>
+      </div>
+      <div class="topbar-actions">
+        <span class="session-pill">First to 2 wins</span>
+        <button id="sound-toggle" class="icon-btn" title="Efek suara: mati" aria-label="Efek suara" aria-pressed="false">🔇</button>
+        <button id="settings-btn" class="icon-btn" title="Pengaturan" aria-label="Pengaturan">⚙</button>
+        <button id="theme-toggle" class="icon-btn" title="Ganti tema" aria-label="Ganti tema">◐</button>
+      </div>
+    </header>
+
+    <!-- ====================== API KEY BANNER ======================= -->
+    <div id="api-banner" class="api-banner hidden">
+      <div class="api-banner-inner">
+        <div>
+          <strong>API key OpenRouter belum diset.</strong>
+          <p>Tempel key untuk mengambil daftar model dan memulai pertandingan. Disimpan lokal di <code>config.json</code>.</p>
+        </div>
+        <div class="api-input-row">
+          <input id="api-key-input" type="password" placeholder="sk-or-..." autocomplete="off" />
+          <button id="api-key-save" class="btn btn-accent">Simpan</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============================ SETUP ============================ -->
+    <main id="setup" class="setup">
+      <div id="resume-banner" class="resume-banner hidden">
+        <span class="resume-dot" aria-hidden="true">⏸</span>
+        <span id="resume-text" class="resume-text"></span>
+        <button id="resume-new" class="btn btn-ghost btn-sm" type="button">Pertandingan baru</button>
+      </div>
+      <div class="setup-grid">
+        <!-- Player A -->
+        <section class="fighter-card side-a" aria-labelledby="label-a">
+          <div class="fighter-head">
+            <span class="dot"></span>
+            <span id="label-a" class="fighter-label">Penantang A</span>
+          </div>
+          <div class="combo" data-side="a">
+            <input class="combo-input" type="text" placeholder="Cari & pilih model..." autocomplete="off" aria-label="Pilih model A" />
+            <ul class="combo-list" role="listbox"></ul>
+          </div>
+          <p class="combo-selected" data-side="a">Belum dipilih</p>
+        </section>
+
+        <!-- VS -->
+        <div class="vs-block">
+          <span class="vs-text">VS</span>
+        </div>
+
+        <!-- Player B -->
+        <section class="fighter-card side-b" aria-labelledby="label-b">
+          <div class="fighter-head">
+            <span class="dot"></span>
+            <span id="label-b" class="fighter-label">Penantang B</span>
+          </div>
+          <div class="combo" data-side="b">
+            <input class="combo-input" type="text" placeholder="Cari & pilih model..." autocomplete="off" aria-label="Pilih model B" />
+            <ul class="combo-list" role="listbox"></ul>
+          </div>
+          <p class="combo-selected" data-side="b">Belum dipilih</p>
+        </section>
+      </div>
+
+      <div class="setup-footer">
+        <div class="models-row">
+          <p id="models-status" class="models-status">Memuat daftar model…</p>
+          <button id="refresh-btn" class="btn btn-ghost btn-sm" title="Muat ulang daftar model dari OpenRouter">
+            <span class="refresh-icon" aria-hidden="true">⟳</span> Refresh
+          </button>
+        </div>
+        <button id="start-btn" class="btn btn-start" disabled>Mulai Pertandingan</button>
+      </div>
+    </main>
+
+    <!-- ============================ ARENA ============================ -->
+    <main id="arena" class="arena hidden">
+      <!-- Scoreboard -->
+      <div class="scoreboard">
+        <div class="score-fighter side-a" id="sb-a">
+          <div class="sf-color" data-color="?"></div>
+          <div class="sf-info">
+            <span class="sf-name">—</span>
+            <span class="sf-meta">menunggu</span>
+          </div>
+          <div class="sf-score">0</div>
+        </div>
+        <div class="score-center">
+          <span class="score-game">Game 1</span>
+          <span class="score-dash">—</span>
+          <span class="score-status" id="score-status">Bersiap…</span>
+        </div>
+        <div class="score-fighter side-b" id="sb-b">
+          <div class="sf-score">0</div>
+          <div class="sf-info">
+            <span class="sf-name">—</span>
+            <span class="sf-meta">menunggu</span>
+          </div>
+          <div class="sf-color" data-color="?"></div>
+        </div>
+      </div>
+
+      <!-- Board + panels -->
+      <div class="arena-body">
+        <div class="board-wrap">
+          <div id="board" class="board" aria-label="Papan catur"></div>
+          <div class="evalbar" id="evalbar" title="Prakiraan material: Ratu 9, Benteng 5, Peluncur/Kuda 3, Pion 1">
+            <span class="eb-label eb-b" title="Hitam">B</span>
+            <div class="eb-track" role="img" aria-label="Bar keseimbangan material Hitam vs Putih">
+              <div class="eb-black" style="width:50%"></div>
+              <div class="eb-white" style="width:50%"></div>
+            </div>
+            <span class="eb-label eb-w" title="Putih">W</span>
+            <span class="eb-diff" id="eb-diff">=</span>
+          </div>
+          <div class="board-foot">
+            <span id="api-calls" class="api-calls" title="Perkiraan jumlah panggilan API (langkah + retry)">Panggilan API: 0</span>
+            <div class="board-foot-actions">
+              <button id="pause-btn" class="btn btn-ghost btn-sm">Jeda</button>
+              <button id="stop-btn" class="btn btn-stop">Hentikan</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Penalaran AI: komentar per langkah (Fitur 1) -->
+        <section class="panel commentary" aria-labelledby="think-title">
+          <div class="panel-head think-head-bar">
+            <span id="think-title" class="think-title">Penalaran AI</span>
+            <div class="think-actions">
+              <span id="think-count" class="think-count" title="Jumlah langkah tercatat">0</span>
+              <button id="think-collapse" class="mini-btn" type="button" title="Lipat/buka semua" aria-label="Lipat semua penalaran" aria-pressed="false">⊟</button>
+              <button id="export-txt" class="mini-btn" type="button" title="Ekspor reasoning (TXT)">TXT</button>
+              <button id="export-json" class="mini-btn" type="button" title="Ekspor reasoning (JSON)">JSON</button>
+            </div>
+          </div>
+          <div id="thinklist" class="thinklist" role="log" aria-live="off" aria-label="Log penalaran AI per langkah">
+            <div class="think-empty">Penalaran tiap langkah akan muncul di sini saat pertandingan berjalan.</div>
+          </div>
+        </section>
+
+        <aside class="side-panels">
+          <div class="panel">
+            <div class="panel-head">
+              <span>Riwayat Langkah</span>
+              <span id="result-badge" class="result-badge hidden"></span>
+            </div>
+            <div id="movelist" class="movelist" aria-live="polite"></div>
+          </div>
+          <div class="panel panel-log">
+            <div class="panel-head"><span>Log &amp; Langkah Ilegal</span></div>
+            <div id="log" class="log" aria-live="polite"></div>
+          </div>
+        </aside>
+      </div>
+
+      <div class="arena-footer">
+        <button id="back-btn" class="btn btn-ghost hidden">← Pertandingan baru</button>
+      </div>
+    </main>
+  </div>
+
+  <!-- Modal Pengaturan -->
+  <div id="settings-overlay" class="modal-overlay hidden">
+    <div class="modal-card" role="dialog" aria-labelledby="settings-title" aria-modal="true">
+      <h2 id="settings-title" class="modal-title">Pengaturan</h2>
+
+      <div class="field">
+        <label class="field-label" for="set-key">API Key</label>
+        <div class="field-row">
+          <input id="set-key" type="password" placeholder="sk-or-..." autocomplete="off" spellcheck="false" />
+          <button id="set-key-toggle" type="button" class="btn btn-ghost btn-sm">Lihat</button>
+        </div>
+        <span class="field-hint">Disimpan permanen di <code>config.json</code> lokal sampai Anda ganti. Kosongkan untuk mempertahankan key tersimpan.</span>
+      </div>
+
+      <div class="field">
+        <label class="field-label" for="set-baseurl">Base URL Provider LLM</label>
+        <input id="set-baseurl" type="text" placeholder="https://openrouter.ai/api/v1" spellcheck="false" />
+        <span class="field-hint">Default OpenRouter. Isi endpoint OpenAI-compatible lain (mis. provider sendiri) bila perlu. Kosongkan untuk kembali ke default.</span>
+      </div>
+
+      <p id="set-error" class="set-error hidden"></p>
+      <div class="modal-actions">
+        <button id="set-cancel" type="button" class="btn btn-ghost">Batal</button>
+        <button id="set-save" type="button" class="btn btn-accent">Simpan</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Overlay pemenang sesi -->
+  <div id="winner-overlay" class="winner-overlay hidden">
+    <div class="winner-card">
+      <span class="winner-eyebrow">Pemenang Sesi</span>
+      <h2 id="winner-name">—</h2>
+      <p id="winner-score">—</p>
+      <button id="winner-close" class="btn btn-accent">Pertandingan Baru</button>
+    </div>
+  </div>
+
+  <script src="qrc:///qtwebchannel/qwebchannel.js"></script>
+  <script src="board.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
